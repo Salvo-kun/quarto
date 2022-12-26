@@ -37,8 +37,8 @@ class Quarto(object):
     MAX_PLAYERS = 2
     BOARD_SIDE = 4
 
-    def __init__(self, board = None) -> None:
-        self.__board = np.ones(shape=(self.BOARD_SIDE, self.BOARD_SIDE), dtype=int) * -1 if board is None else np.array(board, dtype=int)
+    def __init__(self) -> None:
+        self.__board = np.ones(shape=(self.BOARD_SIDE, self.BOARD_SIDE), dtype=int) * -1 
         self.__pieces = []
         self.__pieces.append(Piece(False, False, False, False))  # 0
         self.__pieces.append(Piece(False, False, False, True))  # 1
@@ -113,18 +113,6 @@ class Quarto(object):
         Get index of selected piece
         '''
         return copy.deepcopy(self.__selected_piece_index)
-
-    def get_current_player(self) -> int:
-        '''
-        Get the current player
-        '''
-        return copy.deepcopy(self.__current_player)
-
-    def end_player_turn(self) -> int:
-        '''
-        Pass the turn to the next player
-        '''
-        self.__current_player = (self.__current_player + 1) % self.MAX_PLAYERS
 
     def __check_horizontal(self) -> int:
         for i in range(self.BOARD_SIDE):
@@ -306,5 +294,6 @@ class Quarto(object):
                 x, y = self.__players[self.__current_player].place_piece()
                 piece_ok = self.place(x, y)
             winner = self.check_winner()
+            print(self.__board)
         # self.print()
         return winner

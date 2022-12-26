@@ -3,3 +3,4 @@
 
 from .objects import *
 from .players import *
+from .extensions import *
