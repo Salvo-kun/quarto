@@ -37,8 +37,9 @@ class Quarto(object):
     MAX_PLAYERS = 2
     BOARD_SIDE = 4
 
-    def __init__(self) -> None:
+    def __init__(self, initial_state=None) -> None:
         self.__board = np.ones(shape=(self.BOARD_SIDE, self.BOARD_SIDE), dtype=int) * -1 
+        #self.__board = initial_state
         self.__pieces = []
         self.__pieces.append(Piece(False, False, False, False))  # 0
         self.__pieces.append(Piece(False, False, False, True))  # 1
@@ -284,16 +285,15 @@ class Quarto(object):
         winner = -1
         while winner < 0 and not self.check_finished():
             # self.print()
-            piece_ok = False
-            while not piece_ok:
-                piece_ok = self.select(self.__players[self.__current_player].choose_piece())
-            piece_ok = False
+            idx = self.__players[self.__current_player].choose_piece()
+            assert self.select(idx), f'Ma dio, {self.__players[self.__current_player]}, chose {idx} but board is {self.__board}'
+            #print(f'{self.__current_player} selected {self.__selected_piece_index}')
             self.__current_player = (self.__current_player + 1) % self.MAX_PLAYERS
             # self.print()
-            while not piece_ok:
-                x, y = self.__players[self.__current_player].place_piece()
-                piece_ok = self.place(x, y)
+            x, y = self.__players[self.__current_player].place_piece()
+            assert self.place(x, y), f'Ma dio, {self.__players[self.__current_player]}, put {idx} at {(y, x)} but board is {self.__board}'
+            #print(f'{self.__current_player} placed {self.__selected_piece_index} at {(x, y)}')
             winner = self.check_winner()
-            print(self.__board)
+            # print(self.__board)
         # self.print()
         return winner
