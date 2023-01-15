@@ -2,10 +2,13 @@
 # https://github.com/squillero/computational-intelligence
 
 from copy import deepcopy
+from enum import Enum
 import math
 from .objects import Quarto, Player
 from .extensions import Extensions
 import random
+from functools import reduce
+from operator import and_
 
 class RandomPlayer(Player):
     """Random player"""
@@ -24,11 +27,21 @@ class RandomPlayer(Player):
 class MinMaxPlayer(Player):
     """MinMax player"""
 
-    def __init__(self, quarto: Quarto, max_depth=math.inf, max_combs=None) -> None:
+    class MinMaxBound(Enum):
+        FIXED_DEPTH = 1
+        FIXED_COMPLEXITY = 2
+        VARIABLE_COMPLEXITY = 3
+
+    WIN_SCORE = 12
+    DRAW_SCORE = 11
+
+    def __init__(self, quarto: Quarto, bound: int = 3, bound_value: int = math.factorial(6) ** 2) -> None:
         super().__init__(quarto)
-        self.max_depth = max(max_depth, 1)
         self.best_move = None
-        self.max_combs = max_combs
+        self.max_depth = None
+        self.max_combs = None
+        self.__set_bound(bound, bound_value)
+
 
     def choose_piece(self) -> int:
         if not self.best_move:
@@ -48,24 +61,58 @@ class MinMaxPlayer(Player):
         # print(f'Placing... Best move: {self.best_move}')
         return self.best_move[1][0]
 
-    @staticmethod
-    def __estimate_tree_complexity(game: Quarto):
-        return math.factorial(sum(sum(game.get_board_status() == -1))) ** 2
+    def __set_bound(self, bound: MinMaxBound, bound_value: int):
+        if bound == self.MinMaxBound.FIXED_DEPTH.value:
+            self.max_depth = bound_value
+        elif bound == self.MinMaxBound.FIXED_COMPLEXITY.value: 
+            self.max_combs = bound_value
+        elif bound == self.MinMaxBound.VARIABLE_COMPLEXITY.value: 
+            self.max_combs = bound_value
+        else:
+            raise ValueError(f'Invalid bound type: {bound}. Choose between {[e.value for e in self.MinMaxBound]}')
+
+        self.bound = bound
 
     def __tweak_depth(self, game: Quarto) -> None:
-        if self.max_combs:
-            self.max_depth = math.inf if MinMaxPlayer.__estimate_tree_complexity(game) <= self.max_combs else self.max_depth
+        if self.bound == self.MinMaxBound.FIXED_COMPLEXITY.value: 
+            self.max_depth = math.inf if Extensions.estimate_tree_complexity(game) <= self.max_combs else 1
+        elif self.bound == self.MinMaxBound.VARIABLE_COMPLEXITY.value: 
+            self.max_depth = Extensions.find_depth(sum(sum(game.get_board_status() == -1)), self.max_combs)            
+
+    def __heuristic(self, state: Quarto):
+        score = 0
+        board = state.get_board_status()
+
+        for row in board:
+            useful_pieces = row != -1
+            if sum(useful_pieces) == 3:
+                if reduce(and_, row[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), row[useful_pieces])) != 0:
+                    score += 1                
+
+        for col in board.T:
+            useful_pieces = col != -1
+            if sum(useful_pieces) == 3:
+                if reduce(and_, col[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), col[useful_pieces])) != 0:
+                    score += 1
+
+        for diag in [board.diagonal(), board[::-1].diagonal()]:
+            useful_pieces = diag != -1
+            if sum(useful_pieces) == 3:
+                if reduce(and_, diag[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), diag[useful_pieces])) != 0:
+                    score += 1        
+        
+        return -score if state.get_current_player() == self.get_game().get_current_player() else score
 
     def __minmax(self, state: Quarto, alpha, beta, depth=0):
         if depth >= self.max_depth:
-            return 0.5, None    
+            return self.__heuristic(state), None    
         
         available_pieces = list(i for i in range(state.BOARD_SIDE ** 2) if i not in state.get_board_status() and i != state.get_selected_piece())
         available_positions = list((j % state.BOARD_SIDE, j // state.BOARD_SIDE) for j in range(state.BOARD_SIDE ** 2) if state.get_board_status()[j // state.BOARD_SIDE][j % state.BOARD_SIDE] < 0)
         # print(f'{available_pieces} at depth {depth}') if depth == 0 else None
         # print(f'{available_positions} at depth {depth}') if depth == 0 else None
 
-        if Extensions.get_current_player(state) == Extensions.get_current_player(self.get_game()): # my turn, minimize
+        if state.get_current_player() == self.get_game().get_current_player(): # my turn, minimize
             value = (math.inf, ((math.inf, math.inf), math.inf))
             for x, y in available_positions:
                 middle_state = deepcopy(state)
@@ -77,15 +124,17 @@ class MinMaxPlayer(Player):
                     winner = middle_state.check_winner()  
                     if middle_state.check_finished() or winner != -1:
                         if winner == -1:
-                            winner = 0.5
-                        val = 1 - winner if Extensions.get_current_player(self.get_game()) == 1 else winner
-                        value = min(value, (val, ((x, y), -1)))
+                            score = -MinMaxPlayer.DRAW_SCORE
+                        else:
+                            winner = 1 - winner if self.get_game().get_current_player() == 1 else winner
+                            score = -MinMaxPlayer.WIN_SCORE if winner == 0 else MinMaxPlayer.WIN_SCORE
+                        value = min(value, (score, ((x, y), -1)))
 
                         if value <= alpha:
                             break
 
                         beta = min(beta, value)
-                        # print(f'Winner: {winner} at depth {depth}')
+                        # print(f'Score: {score} at depth {depth}')
                         continue   
 
                 for p in available_pieces:
@@ -113,15 +162,17 @@ class MinMaxPlayer(Player):
                     winner = middle_state.check_winner()  
                     if middle_state.check_finished() or winner != -1:
                         if winner == -1:
-                            winner = 0.5
-                        val = 1 - winner if Extensions.get_current_player(self.get_game()) == 1 else winner
-                        value = max(value, (val, ((x, y), -1)))
+                            score = MinMaxPlayer.DRAW_SCORE
+                        else:
+                            winner = 1 - winner if self.get_game().get_current_player() == 1 else winner
+                            score = -MinMaxPlayer.WIN_SCORE if winner == 0 else MinMaxPlayer.WIN_SCORE
+                        value = max(value, (score, ((x, y), -1)))
                     
                         if value >= beta:
                             break
                         
                         alpha = max(alpha, value) 
-                        # print(f'Winner: {winner} at depth {depth}')
+                        # print(f'Score: {score} at depth {depth}')
                         continue
                     
                 for p in available_pieces:
