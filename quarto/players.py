@@ -17,12 +17,10 @@ class RandomPlayer(Player):
         super().__init__(quarto)
 
     def choose_piece(self) -> int:
-        return random.choice(list(i for i in range(self.get_game().BOARD_SIDE ** 2) if i not in self.get_game().get_board_status() and i != self.get_game().get_selected_piece()))
-        # return random.randint(0, 15)
+        return random.randint(0, 15)
 
     def place_piece(self) -> tuple[int, int]:
-        return random.choice(list((j % self.get_game().BOARD_SIDE, j // self.get_game().BOARD_SIDE) for j in range(self.get_game().BOARD_SIDE ** 2) if self.get_game().get_board_status()[j // self.get_game().BOARD_SIDE][j % self.get_game().BOARD_SIDE] < 0))
-        # return random.randint(0, 3), random.randint(0, 3)
+        return random.randint(0, 3), random.randint(0, 3)
 
 class MinMaxPlayer(Player):
     """MinMax player"""
@@ -35,7 +33,7 @@ class MinMaxPlayer(Player):
     WIN_SCORE = 12
     DRAW_SCORE = 11
 
-    def __init__(self, quarto: Quarto, bound: int = 3, bound_value: int = math.factorial(6) ** 2) -> None:
+    def __init__(self, quarto: Quarto, bound: int = 3, bound_value: int = math.factorial(5) ** 2) -> None:
         super().__init__(quarto)
         self.best_move = None
         self.max_depth = None

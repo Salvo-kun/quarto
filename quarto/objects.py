@@ -1,10 +1,11 @@
 # Free for personal or classroom use; see 'LICENSE.md' for details.
 # https://github.com/squillero/computational-intelligence
 
+from typing import List
 import numpy as np
 from abc import abstractmethod
 import copy
-
+import time
 
 class Player(object):
 
@@ -40,6 +41,7 @@ class Quarto(object):
 
     def __init__(self) -> None:
         self.__players = ()
+        self.__player_stats = [np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])]
         self.reset()
 
     def reset(self):
@@ -181,18 +183,31 @@ class Quarto(object):
         '''
         winner = -1
         while winner < 0 and not self.check_finished():
-            self.print()
+            # self.print()
             piece_ok = False
             while not piece_ok:
-                piece_ok = self.select(
-                    self.__players[self._current_player].choose_piece())
+                t = time.time()
+                piece_ok = self.select(self.__players[self._current_player].choose_piece())
+                dt = time.time() - t
+                self.__player_stats[self._current_player] += np.array([dt, 1, 0.0, 0.0, 0.0, 0.0])
+                self.__player_stats[self._current_player][2] = max(self.__player_stats[self._current_player][2], dt)
             piece_ok = False
-            self._current_player = (
-                self._current_player + 1) % self.MAX_PLAYERS
-            self.print()
+            self._current_player = (self._current_player + 1) % self.MAX_PLAYERS
+            # self.print()
             while not piece_ok:
+                t = time.time()
                 x, y = self.__players[self._current_player].place_piece()
+                dt = time.time() - t
+                self.__player_stats[self._current_player] += np.array([0.0, 0.0, 0.0, dt, 1, 0.0])
+                self.__player_stats[self._current_player][5] = max(self.__player_stats[self._current_player][5], dt)
                 piece_ok = self.place(x, y)
             winner = self.check_winner()
-        self.print()
+        # self.print()
         return winner
+
+    def get_stats(self, print_stats=False) -> List[np.array]:
+        if print_stats:
+            print(f'Player 0: Avg select {self.__player_stats[0][0]/self.__player_stats[0][1]} s (max {self.__player_stats[0][2]} s), Avg place {self.__player_stats[0][3]/self.__player_stats[0][4]} s (max {self.__player_stats[0][5]} s)')
+            print(f'Player 1: Avg select {self.__player_stats[1][0]/self.__player_stats[1][1]} s (max {self.__player_stats[1][2]} s), Avg place {self.__player_stats[1][3]/self.__player_stats[1][4]} s (max {self.__player_stats[1][5]} s)')
+
+        return self.__player_stats
