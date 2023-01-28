@@ -25,10 +25,3 @@ class Extensions():
             if product > max_complexity:
                 return i
         return remaining_turns
-
-    @staticmethod
-    def bitwise_not_wrapper(numbits = 4):
-        def bitwise_not(n):
-            return (1 << numbits) - 1 - n
-
-        return bitwise_not

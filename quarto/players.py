@@ -75,7 +75,7 @@ class MinMaxPlayer(Player):
         if self.bound == self.MinMaxBound.FIXED_COMPLEXITY.value: 
             self.max_depth = math.inf if Extensions.estimate_tree_complexity(game) <= self.max_combs else 1
         elif self.bound == self.MinMaxBound.VARIABLE_COMPLEXITY.value: 
-            self.max_depth = Extensions.find_depth(sum(sum(game.get_board_status() == -1)), self.max_combs)            
+            self.max_depth = max(Extensions.find_depth(sum(sum(game.get_board_status() == -1)), self.max_combs), 1)           
 
     def __heuristic(self, state: Quarto):
         score = 0
@@ -84,19 +84,19 @@ class MinMaxPlayer(Player):
         for row in board:
             useful_pieces = row != -1
             if sum(useful_pieces) == 3:
-                if reduce(and_, row[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), row[useful_pieces])) != 0:
+                if reduce(and_, row[useful_pieces]) != 0 or reduce(and_, row[useful_pieces] ^ 15) != 0:
                     score += 1                
 
         for col in board.T:
             useful_pieces = col != -1
             if sum(useful_pieces) == 3:
-                if reduce(and_, col[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), col[useful_pieces])) != 0:
+                if reduce(and_, col[useful_pieces]) != 0 or reduce(and_, col[useful_pieces] ^ 15) != 0:
                     score += 1
 
         for diag in [board.diagonal(), board[::-1].diagonal()]:
             useful_pieces = diag != -1
             if sum(useful_pieces) == 3:
-                if reduce(and_, diag[useful_pieces]) != 0 or reduce(and_, map(Extensions.bitwise_not_wrapper(4), diag[useful_pieces])) != 0:
+                if reduce(and_, diag[useful_pieces]) != 0 or reduce(and_, diag[useful_pieces] ^ 15) != 0:
                     score += 1        
         
         return -score if state.get_current_player() == self.get_game().get_current_player() else score
@@ -187,3 +187,28 @@ class MinMaxPlayer(Player):
 
                     alpha = max(alpha, value) 
             return value
+
+class ProPlayer(Player):
+    """Pro player: mixture of minmax and fixed first move"""
+
+    def __init__(self, quarto: Quarto, bound: int = 3, bound_value: int = math.factorial(5) ** 2) -> None:
+        super().__init__(quarto)
+        self.minmax_player = MinMaxPlayer(quarto, bound=bound, bound_value=bound_value)
+        self.choosing_strategy = self.__first_choose_piece
+        self.placing_strategy = self.__first_place_piece
+
+    def choose_piece(self) -> int:
+        return self.choosing_strategy()
+
+    def place_piece(self) -> tuple[int, int]:
+        return self.placing_strategy()
+    
+    def __first_choose_piece(self) -> int:        
+        self.choosing_strategy = self.minmax_player.choose_piece
+        self.placing_strategy = self.minmax_player.place_piece
+        return random.randint(0, 15)
+
+    def __first_place_piece(self) -> tuple[int, int]:       
+        self.choosing_strategy = self.minmax_player.choose_piece
+        self.placing_strategy = self.minmax_player.place_piece
+        return random.choice([(abs(x - y), x) for x in range(4) for y in [0, 3]])
